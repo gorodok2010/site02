@@ -1,0 +1,140 @@
+window.AM = window.AM || {};
+
+// Filter state plus pure filter functions. No DOM, no side effects: everything here
+// is a function of (vehicles, state) so the behaviour is testable in isolation.
+
+AM.filters = (function () {
+  const i18n = AM.i18n;
+
+  function defaultState() {
+    return {
+      category: 'scooter',
+      autonomie: [],          // [], [15], [20], [30] — OR, >= semantics
+      poidsBracket: null,     // null = any; otherwise {min, max}
+      pliant: false,
+      sort: 'price_asc'
+    };
+  }
+
+  function state() {
+    if (!current) current = defaultState();
+    return current;
+  }
+
+  let current = null;
+
+  // Changing category resets everything else: `pliant` is wheelchair-only, and keeping
+  // it on the scooter tab produces a plausible-looking empty grid with no explanation.
+  // Sort is a presentation choice, not a category filter, so it survives.
+  function setCategory(category) {
+    const sort = state().sort;
+    current = defaultState();
+    current.category = category === 'wheelchair' ? 'wheelchair' : 'scooter';
+    current.sort = sort;
+    return current;
+  }
+
+  function setSort(sort) {
+    state().sort = sort;
+    return state();
+  }
+
+  function toggleAutonomie(km) {
+    const s = state();
+    const i = s.autonomie.indexOf(km);
+    if (i === -1) s.autonomie.push(km); else s.autonomie.splice(i, 1);
+    s.autonomie.sort(function (a, b) { return a - b; });
+    return s;
+  }
+
+  function setPoidsBracket(bracket) {
+    state().poidsBracket = bracket;
+    return state();
+  }
+
+  function setPliant(value) {
+    state().pliant = value === true;
+    return state();
+  }
+
+  function reset() {
+    const sort = state().sort;
+    current = defaultState();
+    current.sort = sort;
+    return current;
+  }
+
+  function matchesAutonomie(v, selected) {
+    if (!selected.length) return true;
+    if (v.autonomie === null) return false;
+    for (let i = 0; i < selected.length; i++) {
+      if (v.autonomie >= selected[i]) return true; // "from N km", not "exactly N km"
+    }
+    return false;
+  }
+
+  // Brackets are closed and non-overlapping. A vehicle at or below the floor matches
+  // NO bracket and is hidden whenever one is selected — never rendered in a broken bucket.
+  function matchesPoids(v, bracket) {
+    if (!bracket) return true;
+    if (v.poidsMax === null) return false;
+    return v.poidsMax >= bracket.min && v.poidsMax <= bracket.max;
+  }
+
+  function matchesPliant(v, pliant) {
+    if (!pliant) return true;
+    return v.pliant === true;
+  }
+
+  function sortKeyPrice(v) {
+    return v.pricePerHour === null ? Infinity : v.pricePerHour;
+  }
+
+  function compare(a, b) {
+    const s = state().sort;
+    if (s === 'name_asc') return a.name.localeCompare(b.name, i18n.get());
+    const pa = sortKeyPrice(a);
+    const pb = sortKeyPrice(b);
+    if (pa === pb) return a.name.localeCompare(b.name, i18n.get());
+    return s === 'price_desc' ? pb - pa : pa - pb;
+  }
+
+  function apply(vehicles) {
+    const s = state();
+    const out = [];
+    for (let i = 0; i < vehicles.length; i++) {
+      const v = vehicles[i];
+      if (v.category !== s.category) continue;
+      if (!matchesAutonomie(v, s.autonomie)) continue;
+      if (!matchesPoids(v, s.poidsBracket)) continue;
+      if (!matchesPliant(v, s.pliant)) continue;
+      out.push(v);
+    }
+    out.sort(compare);
+    return out;
+  }
+
+  function activeCount() {
+    const s = state();
+    let n = 0;
+    if (s.autonomie.length) n += 1;
+    if (s.poidsBracket) n += 1;
+    if (s.pliant) n += 1;
+    return n;
+  }
+
+  return {
+    defaultState: defaultState,
+    state: state,
+    setCategory: setCategory,
+    setSort: setSort,
+    toggleAutonomie: toggleAutonomie,
+    setPoidsBracket: setPoidsBracket,
+    setPliant: setPliant,
+    reset: reset,
+    apply: apply,
+    activeCount: activeCount,
+    matchesPoids: matchesPoids,
+    matchesAutonomie: matchesAutonomie
+  };
+})();
