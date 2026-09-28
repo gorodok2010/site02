@@ -93,19 +93,33 @@ AM.api = (function () {
     return items;
   }
 
+  // Field names come from the live PocketBase collection, not from the original
+  // brief: title / hourly_rate / deposit_amount / is_active.
   function normalizeScooter(raw) {
     const image = Array.isArray(raw.image) ? raw.image[0] : raw.image;
     return {
       id: String(raw.id),
-      name: String(raw.name || ''),
+      name: String(raw.title || ''),
+      description: stripHtml(raw.description),
       image: image ? (CFG.pocketBaseUrl + '/api/files/scooters/' + raw.id + '/' + encodeURIComponent(image)) : '',
       category: raw.category === 'wheelchair' ? 'wheelchair' : 'scooter',
       autonomie: toNumber(raw.autonomie),
       poidsMax: toNumber(raw.poids_max),
       pliant: raw.pliant === true || raw.pliant === 1 || raw.pliant === 'true',
-      pricePerHour: toNumber(raw.price_per_hour),
-      caution: toNumber(raw.caution)
+      pricePerHour: toNumber(raw.hourly_rate),
+      caution: toNumber(raw.deposit_amount),
+      minHours: toNumber(raw.min_hours),
+      isActive: raw.is_active === true || raw.is_active === 1 || raw.is_active === 'true'
     };
+  }
+
+  // `description` holds HTML authored in the admin UI. innerHTML is forbidden
+  // project-wide, so the markup is parsed into inert nodes and only the text is kept.
+  function stripHtml(value) {
+    if (!value) return '';
+    const holder = document.createElement('div');
+    holder.innerHTML = String(value); // never inserted into the live document
+    return (holder.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
   // Missing / null / non-numeric means "no deposit" — never NaN, never -1.
@@ -116,48 +130,39 @@ AM.api = (function () {
   }
 
   async function fetchCatalog() {
-    const rows = await fetchAllPages('scooters', { sort: 'name' });
+    const rows = await fetchAllPages('scooters', { sort: 'title' });
     return rows.map(normalizeScooter);
   }
 
-  // One query for the whole window. The server filter only narrows by start_datetime;
-  // the overlap test runs client-side because PocketBase's DSL has no field arithmetic.
+  // Availability is read from the `public_bookings` VIEW, never from `bookings`
+  // itself. The view exposes only vehicle + window, so no customer data can leak
+  // even if the collection is misconfigured later.
   async function fetchBusyWindows(startUtc, endUtc) {
-    const filter =
-      "(start_datetime < '" + endUtc.toISOString() + "'" +
-      " && status != 'canceled'" +
-      " && stripe_payment_status != 'failed'" +
-      " && stripe_payment_status != 'refunded')";
-
-    let rows;
-    try {
-      rows = await fetchAllPages('bookings', {
-        filter: filter,
-        fields: 'scooter,start_datetime,duration_hours,status,stripe_payment_status'
-      });
-    } catch (err) {
-      // A hidden field can make `fields` fail with 400. Retry unfiltered rather than
-      // reporting the availability check as broken.
-      if (err instanceof ApiError && err.kind === 'http' && err.detail && err.detail.status === 400) {
-        rows = await fetchAllPages('bookings', { filter: filter });
-      } else {
-        throw err;
-      }
-    }
+    const filter = "(end_datetime > '" + startUtc.toISOString() + "' && start_datetime < '" + endUtc.toISOString() + "')";
+    const rows = await fetchAllPages('public_bookings', { filter: filter });
 
     const windows = [];
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
-      const s = Date.parse(r.start_datetime);
-      const hours = toNumber(r.duration_hours);
-      if (!Number.isFinite(s) || hours === null) continue;
-      windows.push({
-        vehicleId: String(r.scooter || ''),
-        start: s,
-        end: s + hours * 3600000
-      });
+      const s = parseUtc(r.start_datetime);
+      const e = parseUtc(r.end_datetime);
+      if (s === null || e === null) continue;
+      windows.push({ vehicleId: String(r.scooter || ''), start: s, end: e });
     }
     return windows;
+  }
+
+  // The view mixes formats: some rows end in `Z`, some do not. A datetime without a
+  // zone is parsed as LOCAL time by the browser, which would shift a window by the
+  // user's UTC offset and block the wrong slots. PocketBase emits UTC, so treat a
+  // naive value as UTC instead.
+  function parseUtc(value) {
+    if (!value) return null;
+    const raw = String(value).trim();
+    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+    const iso = hasZone ? raw : raw.replace(' ', 'T') + 'Z';
+    const t = Date.parse(iso);
+    return Number.isFinite(t) ? t : null;
   }
 
   // Nominatim. One request per search: the usage policy forbids bulk or pre-warm calls.

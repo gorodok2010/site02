@@ -245,6 +245,11 @@ window.AM = window.AM || {};
     ]);
   }
 
+  function specNumber(value, suffix) {
+    if (value === null || value === 0) return '—';
+    return value + suffix;
+  }
+
   function renderCard(v) {
     const img = el('img', {
       alt: i18n.t('catalog.imageAlt', { name: v.name }),
@@ -258,9 +263,13 @@ window.AM = window.AM || {};
     img.src = v.image || CFG.fallbackImage;
 
     const specs = [
-      specRow(i18n.t('catalog.autonomie'), v.autonomie === null ? null : v.autonomie + ' km'),
-      specRow(i18n.t('catalog.poids'), v.poidsMax === null ? null : v.poidsMax + ' kg')
+      specRow(i18n.t('catalog.autonomie'), specNumber(v.autonomie, ' km')),
+      specRow(i18n.t('catalog.poids'), specNumber(v.poidsMax, ' kg'))
     ].filter(Boolean);
+
+    // An inactive vehicle stays in the grid, greyed and labelled, so the catalogue
+    // does not look like it is hiding stock. Hidden items invite a support call.
+    const inactive = !v.isActive;
 
     // Selection is not wired until Stage B. Labelled, disabled, and obviously inert —
     // never a dead unlabelled button.
@@ -268,21 +277,27 @@ window.AM = window.AM || {};
       type: 'button',
       disabled: true,
       'aria-disabled': 'true',
-      class: 'w-full rounded-lg bg-slate-200 text-slate-500 px-3 py-2.5 text-sm font-semibold cursor-not-allowed',
-      attrs: { title: i18n.t('catalog.soonHint') },
-      text: i18n.t('catalog.soon')
+      class: 'w-full rounded-lg px-3 py-2.5 text-sm font-semibold cursor-not-allowed ' +
+        (inactive ? 'bg-slate-100 text-slate-400' : 'bg-slate-200 text-slate-500'),
+      attrs: { title: inactive ? i18n.t('catalog.inactive') : i18n.t('catalog.soonHint') },
+      text: inactive ? i18n.t('catalog.inactive') : i18n.t('catalog.soon')
     });
 
-    return el('article', { class: 'rounded-xl border border-slate-200 bg-white p-4 flex flex-col' }, [
+    return el('article', {
+      class: 'rounded-xl border border-slate-200 bg-white p-4 flex flex-col' +
+        (inactive ? ' opacity-60' : '')
+    }, [
       img,
       el('h3', { class: 'mt-3 font-semibold leading-snug', text: v.name }),
-      el('div', { class: 'mt-1 flex flex-wrap gap-1' }, [
+      v.description ? el('p', { class: 'mt-1 text-sm text-slate-500', text: v.description }) : null,
+      el('div', { class: 'mt-2 flex flex-wrap gap-1' }, [
         el('span', { class: 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600', text: i18n.t('category.' + v.category) }),
-        v.pliant ? el('span', { class: 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800', text: i18n.t('catalog.pliant') }) : null
+        v.pliant ? el('span', { class: 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800', text: i18n.t('catalog.pliant') }) : null,
+        inactive ? el('span', { class: 'rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 font-semibold', text: i18n.t('catalog.inactive') }) : null
       ]),
       el('div', { class: 'mt-3' }, specs),
       el('div', { class: 'mt-3 pt-3 border-t border-slate-100 flex items-baseline gap-1' }, [
-        el('span', { class: 'text-xl font-bold', text: i18n.money(v.pricePerHour === null ? 0 : v.pricePerHour) }),
+        el('span', { class: 'text-xl font-bold', text: v.pricePerHour === null ? '—' : i18n.money(v.pricePerHour) }),
         el('span', { class: 'text-sm text-slate-500', text: i18n.t('catalog.perHour') })
       ]),
       el('div', { class: 'mt-4 pt-1' }, [cta])
