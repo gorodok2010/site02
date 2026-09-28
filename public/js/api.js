@@ -173,14 +173,21 @@ AM.api = (function () {
   }
 
   // Nominatim. One request per search: the usage policy forbids bulk or pre-warm calls.
-  function searchAddress(query, signal) {
+  //
+  // The search is bounded by `viewbox` around the commune the customer already chose.
+  // That is the working way to keep free text inside the delivery area: `postalcode`
+  // is rejected by Nominatim when combined with `q` (HTTP 400), and `city` alone does
+  // not constrain the result set.
+  function searchAddress(query, bounds, signal) {
     const url = buildUrl(CFG.nominatimUrl, {
       q: query,
       format: 'jsonv2',
       addressdetails: 1,
       limit: 6,
       countrycodes: CFG.addressCountryCode,
-      accept_language: AM.i18n.get()
+      accept_language: AM.i18n.get(),
+      viewbox: bounds ? bounds.join(',') : '',
+      bounded: bounds ? '1' : ''
     });
     return request(url, { signal: signal }).then(function (r) { return r.json(); });
   }

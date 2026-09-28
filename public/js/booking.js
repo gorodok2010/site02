@@ -23,6 +23,8 @@ AM.booking = (function () {
     start: null,
     end: null,
     place: null,          // { lat, lon, label } once the user picks an address
+    commune: null,        // the matched entry from CFG.deliveryCommunes, when there was one
+    communeHits: [],      // local matches for the current query
     name: '',
     email: '',
     phone: '',
@@ -122,6 +124,8 @@ AM.booking = (function () {
     s.start = start;
     s.end = new Date(start.getTime() + minHours * 3600000);
     s.place = null;
+    s.commune = null;
+    s.communeHits = [];
     s.name = '';
     s.email = '';
     s.phone = '';
@@ -144,13 +148,14 @@ AM.booking = (function () {
     return haversineKm(CFG.baseCoords, s.place);
   }
 
-  // null means "not known yet": delivery chosen but no address picked. Showing that as
-  // free would claim a price nobody has agreed to.
+  // Fee is one of: 0, a euro amount, null ("not known yet — no address chosen") or
+  // 'quote' (a listed commune that sits beyond every distance band). The whitelist in
+  // config decides whether we deliver at all; the distance only decides the price.
   function deliveryFee() {
     if (s.mode === 'pickup') return 0;
     if (!s.place) return null;
     const tier = tierFor(distanceKm());
-    return tier ? tier.fee : null;   // null = outside the delivery area
+    return tier ? tier.fee : 'quote';
   }
 
   function price() {
@@ -159,12 +164,13 @@ AM.booking = (function () {
     const rental = v.pricePerHour === null ? null : v.pricePerHour * h;
     const fee = deliveryFee();
     const deposit = v.caution === null ? 0 : v.caution;
+    const feeKnown = typeof fee === 'number';
     return {
       hours: h,
       rental: rental,
       fee: fee,
       deposit: deposit,
-      total: rental === null || fee === null ? null : rental + fee + deposit
+      total: rental === null || !feeKnown ? null : rental + fee + deposit
     };
   }
 
@@ -179,9 +185,12 @@ AM.booking = (function () {
 
   function validatePeriod() {
     if (!s.start) return 'startInPast';
-    if (!s.end) return 'endAfterStart';
+    if (!s.end) return 'endRequired';
     if (s.start.getTime() < Date.now()) return 'startInPast';
     if (s.end.getTime() < Date.now()) return 'endInPast';
+    // Checked before the minimum: an end at or before the start gives a zero or
+    // negative duration, and reporting that as "too short" hides the real mistake.
+    if (s.end.getTime() <= s.start.getTime()) return 'endAfterStart';
     const minHours = minHoursFor();
     if (hours() < minHours) return 'minHours';
     if (hours() > CFG.maxRentalHours) return 'maxDuration';
@@ -237,9 +246,71 @@ AM.booking = (function () {
 
   // --- address search --------------------------------------------------------
 
+  // Commune matching is local: the list is in config.js with coordinates, so a city
+  // or postal code resolves instantly and without touching Nominatim. Only the
+  // street-address half of the hybrid needs the network.
+  function normalise(value) {
+    return String(value || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/['’-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function matchCommunes(query) {
+    const q = normalise(query);
+    if (q.length < 2) return [];
+    const hits = [];
+    CFG.deliveryCommunes.forEach(function (c) {
+      const n = normalise(c.name);
+      const p = normalise(c.postalCode);
+      const score = n === q ? 0
+        : n.indexOf(q) === 0 ? 1
+          : n.indexOf(q) !== -1 ? 2
+            : p === q ? 1
+              : p.indexOf(q) === 0 ? 3
+                : -1;
+      if (score !== -1) hits.push({ commune: c, score: score });
+    });
+    hits.sort(function (a, b) { return a.score - b.score || a.commune.name.localeCompare(b.commune.name); });
+    return hits.slice(0, 6).map(function (h) { return h.commune; });
+  }
+
+  // Nominatim orders a viewbox as lon_min,lat_min,lon_max,lat_max. A twentieth of a
+  // degree is about 5.5 km, which covers a rural commune while still excluding the
+  // neighbouring village, so a street search cannot wander off after a town is picked.
+  function boundsFor(commune) {
+    if (!commune) return null;
+    const dLat = 0.05;
+    const dLon = 0.05;
+    return [
+      round(commune.lon - dLon), round(commune.lat - dLat),
+      round(commune.lon + dLon), round(commune.lat + dLat)
+    ];
+  }
+
+  function round(n) { return Math.round(n * 10000) / 10000; }
+
   const runAddressSearch = debounce(function (query) {
     const token = ++addressToken;
     s.addressQuery = query;
+    // Typing invalidates the committed address, otherwise the summary keeps quoting a
+    // delivery point the customer is in the middle of replacing. The commune is kept:
+    // it is the search area, not the answer.
+    s.place = null;
+
+    const local = matchCommunes(query);
+    if (local.length) {
+      // A commune hit is enough to act on: no reason to wait on a network round trip.
+      s.communeHits = local;
+      s.addressResults = [];
+      s.addressBusy = false;
+      patchInPlace();
+      return;
+    }
+
+    s.communeHits = [];
     if (query.trim().length < 3) {
       s.addressResults = [];
       s.addressBusy = false;
@@ -249,7 +320,13 @@ AM.booking = (function () {
     s.addressBusy = true;
     patchInPlace();
 
-    api.searchAddress(query)
+    // Once a commune is chosen, this is a street search inside it. Nominatim matches
+    // on feature names, so a bare "rue de la Marne" finds nothing while
+    // "rue de la Marne, Taissy" resolves. Only do this when the typed text is not
+    // itself a commune, otherwise it would fight the commune the user is switching to.
+    const streetQuery = s.commune ? query + ', ' + s.commune.name : query;
+
+    api.searchAddress(streetQuery, boundsFor(s.commune))
       .then(function (results) {
         if (token !== addressToken) return;
         s.addressResults = (results || []).slice(0, 6).map(function (r) {
@@ -264,7 +341,7 @@ AM.booking = (function () {
         s.addressBusy = false;
         patchInPlace();
       });
-  }, 500);
+  }, 400);
 
   // --- render ----------------------------------------------------------------
 
@@ -404,19 +481,48 @@ AM.booking = (function () {
         onInput: function (v) { runAddressSearch(v); }
       }),
       el('p', { class: 'mb-2 text-xs text-slate-500', text: i18n.t('booking.addressHint') }),
-      el('div', { attrs: { 'data-bk-address-out': '1' } }, [addressResultList(), addressNote()])
+      el('div', { attrs: { 'data-bk-address-out': '1' } }, [
+        addressResultList(), addressNote(), distanceNote()
+      ])
     ]);
   }
 
+  function communeRow(c) {
+    return el('li', {}, [
+      el('button', {
+        type: 'button',
+        class: 'w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 flex items-center gap-2',
+        onclick: function () {
+          s.commune = c;
+          s.place = { lat: c.lat, lon: c.lon, label: c.name + ' (' + c.postalCode + ')' };
+          s.addressQuery = c.name;
+          s.addressResults = [];
+          s.communeHits = [];
+          addressToken += 1;
+          patchInPlace();
+        }
+      }, [
+        el('span', { class: 'font-medium', text: c.name }),
+        el('span', { class: 'text-slate-500', text: c.postalCode })
+      ])
+    ]);
+  }
+
+  function resultList(items, renderItem) {
+    return el('ul', {
+      class: 'rounded-lg border border-slate-300 divide-y divide-slate-200 max-h-56 overflow-y-auto',
+      attrs: { 'aria-label': i18n.t('booking.addressResults') }
+    }, items.map(renderItem));
+  }
+
   function addressResultList() {
+    const communes = s.communeHits || [];
+    if (communes.length) return resultList(communes, communeRow);
     if (s.addressBusy) {
       return el('p', { class: 'text-sm text-slate-500', text: i18n.t('booking.checking') });
     }
     if (!s.addressResults.length) return null;
-    return el('ul', {
-      class: 'rounded-lg border border-slate-300 divide-y divide-slate-200 max-h-56 overflow-y-auto',
-      attrs: { 'aria-label': i18n.t('booking.addressResults') }
-    }, s.addressResults.map(function (p) {
+    return resultList(s.addressResults, function (p) {
       return el('li', {}, [
         el('button', {
           type: 'button',
@@ -426,12 +532,13 @@ AM.booking = (function () {
             s.place = p;
             s.addressQuery = p.label;
             s.addressResults = [];
+            s.communeHits = [];
             addressToken += 1;
             patchInPlace();
           }
         })
       ]);
-    }));
+    });
   }
 
   function addressNote() {
@@ -444,14 +551,24 @@ AM.booking = (function () {
   function distanceNote() {
     const km = distanceKm();
     if (km === null) return null;
-    if (!tierFor(km)) {
+    const tier = tierFor(km);
+    if (!tier) {
+      // A whitelisted commune is deliverable even when it falls outside every price
+      // band, so this is a quote, not a refusal. Only an address outside the whitelist
+      // is turned away.
+      if (s.commune) {
+        return el('p', {
+          class: 'mt-1 text-xs text-slate-500',
+          text: i18n.t('booking.distanceQuote', { km: Math.round(km * 10) / 10 })
+        });
+      }
       return el('p', { class: 'mt-1 text-sm text-red-700', text: i18n.t('booking.outsideRadius', { max: CFG.deliveryMaxKm }) });
     }
     return el('p', {
       class: 'mt-1 text-xs text-slate-500',
       text: i18n.t('booking.withinRadius', {
         km: Math.round(km * 10) / 10,
-        fee: tierFor(km).fee === 0 ? i18n.t('booking.free') : i18n.money(tierFor(km).fee)
+        fee: tier.fee === 0 ? i18n.t('booking.free') : i18n.money(tier.fee)
       })
     });
   }
@@ -521,9 +638,11 @@ AM.booking = (function () {
 
   function summaryBlock() {
     const p = price();
-    const feeText = s.mode === 'pickup'
-      ? i18n.t('booking.free')
-      : (p.fee === null ? '—' : (p.fee === 0 ? i18n.t('booking.free') : i18n.money(p.fee)));
+    let feeText;
+    if (s.mode === 'pickup') feeText = i18n.t('booking.free');
+    else if (p.fee === null) feeText = '—';
+    else if (p.fee === 'quote') feeText = i18n.t('booking.deliveryQuote');
+    else feeText = p.fee === 0 ? i18n.t('booking.free') : i18n.money(p.fee);
 
     return el('div', { class: 'mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4', attrs: { 'data-bk-summary': '1' } }, [
       el('p', { class: 'text-sm font-semibold mb-2', text: i18n.t('booking.summary') }),
@@ -652,7 +771,8 @@ AM.booking = (function () {
       rentalAmount: p.rental,
       deliveryType: s.mode,
       deliveryAddress: s.mode === 'delivery' && s.place ? s.place.label : null,
-      deliveryFee: p.fee,
+      // 'quote' is a display state, not a price. Never let it reach the webhook.
+      deliveryFee: typeof p.fee === 'number' ? p.fee : null,
       depositAmount: p.deposit,
       totalAmount: p.total,
       customerName: s.name.trim(),
