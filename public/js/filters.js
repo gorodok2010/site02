@@ -76,12 +76,18 @@ AM.filters = (function () {
     return false;
   }
 
-  // Brackets are closed and non-overlapping. A vehicle at or below the floor matches
-  // NO bracket and is hidden whenever one is selected — never rendered in a broken bucket.
+  // `poidsMax` is what the vehicle can CARRY, while the bracket is a passenger's
+  // weight. The question is therefore "can this vehicle take someone from this
+  // range?", which any vehicle rated at or above the top of the range can answer —
+  // the same "at least" logic as the range filter.
+  //
+  // So 50-119 keeps a 150 kg vehicle (it can carry a 119 kg passenger too), and
+  // 120-150 drops a 119 kg one (it cannot carry a 150 kg passenger). Brackets stay
+  // closed and non-overlapping, so ticking both means "119 kg or more".
   function matchesPoids(v, bracket) {
     if (!bracket) return true;
     if (v.poidsMax === null) return false;
-    return v.poidsMax >= bracket.min && v.poidsMax <= bracket.max;
+    return v.poidsMax >= bracket.max;
   }
 
   function matchesPliant(v, pliant) {

@@ -57,8 +57,8 @@ AM.i18n = (function () {
   // changes what the catalogue means.
   const AUTONOMIE_OPTIONS = [15, 20, 30];
 
-  // Closed and non-overlapping. A vehicle below the floor or above the ceiling
-  // matches no bracket and is hidden whenever a bracket is selected.
+  // Closed and non-overlapping, and read as a passenger's weight: a vehicle matches a
+  // bracket when its capacity is at least the top of that bracket. See matchesPoids.
   const POIDS_BRACKETS = [
     { min: 50, max: 119 },
     { min: 120, max: 150 }

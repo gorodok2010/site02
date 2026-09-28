@@ -146,7 +146,8 @@ window.AM = window.AM || {};
 
     // Poids max — single-select radio. There is deliberately no "any" option:
     // unselecting everything is what means "no constraint", and the reset button
-    // gets you back there.
+    // gets you back there. The bracket is the passenger's weight, so a vehicle is
+    // kept whenever its capacity covers the top of the chosen range.
     const poids = el('fieldset', { class: 'mb-5' }, [
       el('legend', { class: 'text-sm font-semibold mb-2', text: i18n.t('filters.poids') })
     ]);
