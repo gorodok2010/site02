@@ -265,17 +265,22 @@ window.AM = window.AM || {};
     // does not look like it is hiding stock. Hidden items invite a support call.
     const inactive = !v.isActive;
 
-    // Selection is not wired until Stage B. Labelled, disabled, and obviously inert —
-    // never a dead unlabelled button.
-    const cta = el('button', {
-      type: 'button',
-      disabled: true,
-      'aria-disabled': 'true',
-      class: 'w-full rounded-lg px-3 py-2.5 text-sm font-semibold cursor-not-allowed ' +
-        (inactive ? 'bg-slate-100 text-slate-400' : 'bg-slate-200 text-slate-500'),
-      attrs: { title: inactive ? i18n.t('catalog.inactive') : i18n.t('catalog.soonHint') },
-      text: inactive ? i18n.t('catalog.inactive') : i18n.t('catalog.soon')
-    });
+    // An active vehicle opens the booking window. The final payment button inside is
+    // still inert — Stage B is interface only until the n8n submit is wired.
+    const cta = inactive
+      ? el('button', {
+        type: 'button',
+        disabled: true,
+        'aria-disabled': 'true',
+        class: 'w-full rounded-lg bg-slate-100 text-slate-400 px-3 py-2.5 text-sm font-semibold cursor-not-allowed',
+        text: i18n.t('catalog.inactive')
+      })
+      : el('button', {
+        type: 'button',
+        class: 'w-full rounded-lg bg-blue-700 text-white px-3 py-2.5 text-sm font-semibold hover:bg-blue-800',
+        text: i18n.t('booking.open'),
+        onclick: function () { AM.booking.open(v); }
+      });
 
     return el('article', {
       class: 'rounded-xl border border-slate-200 bg-white p-4 flex flex-col' +
@@ -350,6 +355,8 @@ window.AM = window.AM || {};
     i18n.set(lang);
     document.querySelector('meta[property="og:locale"]').setAttribute('content', lang === 'fr' ? 'fr_FR' : 'en_US');
     if (state.offline) state.vehicles = AM.mockVehicles.get(lang);
+    // The booking window is built from strings, so it has to re-read them too.
+    AM.booking.refresh();
     render();
   }
 
@@ -421,6 +428,7 @@ window.AM = window.AM || {};
   function init() {
     cacheDom();
     i18n.init();
+    AM.booking.init();
     wire();
     filters.reset();
     dom.sortSelect.value = filters.state().sort;
