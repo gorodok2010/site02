@@ -1,0 +1,18 @@
+# Cloudflare Worker deployment.
+#
+# The site is static: plain HTML, CSS and browser JS. There is no Worker script —
+# the Worker exists only to serve the files in this directory. Unknown paths
+# return 404, which is what a plain assets deployment does.
+#
+# Deploy:  wrangler deploy
+# Verify the site afterwards: https://site02.valeriy-smovzhenko.workers.dev/
+
+name = "site02"
+compatibility_date = "2026-09-26"
+
+# The site lives in public/. Only that directory is uploaded, which keeps the
+# repository's own files — including the .git folder and its full commit history —
+# off the public internet. Never point this at "./".
+[assets]
+directory = "./public"
+not_found_handling = "404-page"
