@@ -115,30 +115,34 @@ window.AM = window.AM || {};
     clear(panel);
 
     // Autonomie — checkboxes, multi-select OR, ">=" semantics.
-    const aut = el('fieldset', { class: 'mb-5' }, [
-      el('legend', { class: 'text-sm font-semibold mb-2', text: i18n.t('filters.autonomie') })
-    ]);
-    i18n.AUTONOMIE_OPTIONS.forEach(function (km) {
-      const id = 'aut-' + km;
-      const input = el('input', {
-        type: 'checkbox',
-        id: id,
-        class: 'w-5 h-5 rounded border-slate-400',
-        checked: s.autonomie.indexOf(km) !== -1,
-        attrs: { 'data-autonomie': km },
-        onchange: function () { filters.toggleAutonomie(km); render(); }
+    // Scooter tab only: a wheelchair is pushed by hand, so range is meaningless
+    // there. Removed from the DOM rather than hidden, so it can never be active.
+    if (s.category === 'scooter') {
+      const aut = el('fieldset', { class: 'mb-5' }, [
+        el('legend', { class: 'text-sm font-semibold mb-2', text: i18n.t('filters.autonomie') })
+      ]);
+      i18n.AUTONOMIE_OPTIONS.forEach(function (km) {
+        const id = 'aut-' + km;
+        const input = el('input', {
+          type: 'checkbox',
+          id: id,
+          class: 'w-5 h-5 rounded border-slate-400',
+          checked: s.autonomie.indexOf(km) !== -1,
+          attrs: { 'data-autonomie': km },
+          onchange: function () { filters.toggleAutonomie(km); render(); }
+        });
+        aut.appendChild(
+          el('label', { attrs: { for: id }, class: 'flex items-center gap-3 py-1.5 text-sm cursor-pointer' }, [
+            input,
+            el('span', { text: i18n.t('filters.autonomieUpTo', { km: km }) })
+          ])
+        );
       });
       aut.appendChild(
-        el('label', { attrs: { for: id }, class: 'flex items-center gap-3 py-1.5 text-sm cursor-pointer' }, [
-          input,
-          el('span', { text: i18n.t('filters.autonomieUpTo', { km: km }) })
-        ])
+        el('p', { class: 'text-xs text-slate-500 mt-1', text: i18n.t('filters.autonomieHint') })
       );
-    });
-    aut.appendChild(
-      el('p', { class: 'text-xs text-slate-500 mt-1', text: i18n.t('filters.autonomieHint') })
-    );
-    panel.appendChild(aut);
+      panel.appendChild(aut);
+    }
 
     // Poids max — single-select radio. There is deliberately no "any" option:
     // unselecting everything is what means "no constraint", and the reset button

@@ -9,7 +9,7 @@ AM.filters = (function () {
   function defaultState() {
     return {
       category: 'scooter',
-      autonomie: [],          // [], [15], [20], [30] — OR, >= semantics
+      autonomie: [],          // [], [15], [20], [30] — OR, ">=" semantics. Scooter tab only.
       poidsBracket: null,     // null = any; otherwise {min, max}
       pliant: false,
       sort: 'price_asc'
@@ -64,13 +64,14 @@ AM.filters = (function () {
     return current;
   }
 
-  // "Up to N km": the vehicle's range must not exceed the selected ceiling.
-  // Multi-select OR, so ticking 15 and 30 means "30 km or less".
+  // "Up to N km" is a FLOOR, not a ceiling: the customer needs a vehicle that can
+  // cover the distance, so the vehicle's range must be at least the ticked value.
+  // Multi-select OR, so ticking 15 and 30 means "15 km or more".
   function matchesAutonomie(v, selected) {
     if (!selected.length) return true;
     if (v.autonomie === null) return false;
     for (let i = 0; i < selected.length; i++) {
-      if (v.autonomie <= selected[i]) return true;
+      if (v.autonomie >= selected[i]) return true;
     }
     return false;
   }
@@ -92,13 +93,13 @@ AM.filters = (function () {
     return v.pricePerHour === null ? Infinity : v.pricePerHour;
   }
 
+  // Only two sort orders remain. Name is still the tie-break, so equal prices keep a
+  // stable, readable order instead of whatever the API happened to return.
   function compare(a, b) {
-    const s = state().sort;
-    if (s === 'name_asc') return a.name.localeCompare(b.name, i18n.get());
     const pa = sortKeyPrice(a);
     const pb = sortKeyPrice(b);
     if (pa === pb) return a.name.localeCompare(b.name, i18n.get());
-    return s === 'price_desc' ? pb - pa : pa - pb;
+    return state().sort === 'price_desc' ? pb - pa : pa - pb;
   }
 
   function apply(vehicles) {
@@ -107,7 +108,9 @@ AM.filters = (function () {
     for (let i = 0; i < vehicles.length; i++) {
       const v = vehicles[i];
       if (v.category !== s.category) continue;
-      if (!matchesAutonomie(v, s.autonomie)) continue;
+      // Range is a scooter-only concept. Gating on the category here as well as in the
+      // UI means a stale selection can never silently empty the wheelchair tab.
+      if (s.category === 'scooter' && !matchesAutonomie(v, s.autonomie)) continue;
       if (!matchesPoids(v, s.poidsBracket)) continue;
       if (!matchesPliant(v, s.pliant)) continue;
       out.push(v);
@@ -119,7 +122,7 @@ AM.filters = (function () {
   function activeCount() {
     const s = state();
     let n = 0;
-    if (s.autonomie.length) n += 1;
+    if (s.category === 'scooter' && s.autonomie.length) n += 1;
     if (s.poidsBracket) n += 1;
     if (s.pliant) n += 1;
     return n;

@@ -37,7 +37,7 @@ AM.CONTENT = {
       open: 'Filtres',
       close: 'Fermer',
       autonomie: 'Autonomie',
-      autonomieHint: 'Cochez pour une autonomie maximale',
+      autonomieHint: 'Cochez pour une autonomie minimale',
       autonomieUpTo: 'Jusqu\'à {km} km',
       poids: 'Poids max.',
       pliant: 'Pliant',
@@ -48,8 +48,7 @@ AM.CONTENT = {
     sort: {
       label: 'Trier',
       price_asc: 'Prix croissant',
-      price_desc: 'Prix décroissant',
-      name_asc: 'Nom (A–Z)'
+      price_desc: 'Prix décroissant'
     },
 
     catalog: {
@@ -224,7 +223,7 @@ AM.CONTENT = {
       open: 'Filters',
       close: 'Close',
       autonomie: 'Range',
-      autonomieHint: 'Tick for a maximum range',
+      autonomieHint: 'Tick for a minimum range',
       autonomieUpTo: 'Up to {km} km',
       poids: 'Max. load',
       pliant: 'Folding',
@@ -235,8 +234,7 @@ AM.CONTENT = {
     sort: {
       label: 'Sort',
       price_asc: 'Price: low to high',
-      price_desc: 'Price: high to low',
-      name_asc: 'Name (A–Z)'
+      price_desc: 'Price: high to low'
     },
 
     catalog: {
