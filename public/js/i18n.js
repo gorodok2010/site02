@@ -60,8 +60,7 @@ AM.i18n = (function () {
   // Closed and non-overlapping. A vehicle below the floor or above the ceiling
   // matches no bracket and is hidden whenever a bracket is selected.
   const POIDS_BRACKETS = [
-    { min: 50, max: 99 },
-    { min: 100, max: 119 },
+    { min: 50, max: 119 },
     { min: 120, max: 150 }
   ];
 

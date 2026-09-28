@@ -71,6 +71,13 @@ AM.booking = (function () {
 
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
+  // replaceChildren() stringifies a null argument, which prints a literal "null"
+  // into the page. Children here are optional by design, so they are filtered out.
+  function replaceChildren(node, children) {
+    clear(node);
+    [].concat(children).forEach(function (c) { if (c) node.appendChild(c); });
+  }
+
   function debounce(fn, ms) {
     let timer = null;
     return function () {
@@ -163,13 +170,19 @@ AM.booking = (function () {
 
   // --- validation ------------------------------------------------------------
 
+  // The per-vehicle minimum is the floor, never a suggestion. A booking shorter than
+  // it cannot be priced or submitted, and the end field refuses to offer such a time.
+  function minHoursFor() {
+    const v = s.vehicle;
+    return (v && v.minHours) || CFG.minRentalHours;
+  }
+
   function validatePeriod() {
     if (!s.start) return 'startInPast';
     if (!s.end) return 'endAfterStart';
     if (s.start.getTime() < Date.now()) return 'startInPast';
-    if (s.end.getTime() <= s.start.getTime()) return 'endAfterStart';
     if (s.end.getTime() < Date.now()) return 'endInPast';
-    const minHours = s.vehicle.minHours || CFG.minRentalHours;
+    const minHours = minHoursFor();
     if (hours() < minHours) return 'minHours';
     if (hours() > CFG.maxRentalHours) return 'maxDuration';
     return null;
@@ -289,8 +302,7 @@ AM.booking = (function () {
   }
 
   function periodBlock() {
-    const v = s.vehicle;
-    const minHours = v.minHours || CFG.minRentalHours;
+    const minHours = minHoursFor();
     const minValue = toInputValue(dates.nextFullHour(new Date()));
     const problem = validatePeriod();
     const problemText = problem && problem !== 'minHours' && problem !== 'maxDuration'
@@ -301,6 +313,9 @@ AM.booking = (function () {
       : (problem === 'maxDuration'
         ? i18n.t('booking.maxDuration', { days: Math.round(CFG.maxRentalHours / 24) })
         : '');
+
+    // The end field can never offer a time closer than the minimum to the start.
+    const endMin = toInputValue(new Date(s.start.getTime() + minHours * 3600000));
 
     return el('fieldset', { class: 'mb-5' }, [
       el('legend', { class: 'text-sm font-semibold mb-2', text: i18n.t('booking.period') }),
@@ -314,10 +329,10 @@ AM.booking = (function () {
               const next = dates.inputValueToUtc(this.value);
               if (!next) return;
               s.start = next;
-              // Keep the window valid: drag the end along rather than leaving the
-              // two fields in a state the summary cannot price.
-              const minEnd = new Date(next.getTime() + minHours * 3600000);
-              if (!s.end || s.end.getTime() < minEnd.getTime()) s.end = minEnd;
+              // Drag the end along rather than leaving the two fields in a state the
+              // summary cannot price.
+              const floor = new Date(next.getTime() + minHours * 3600000);
+              if (!s.end || s.end.getTime() < floor.getTime()) s.end = floor;
               s.errors = {};
               scheduleAvailability();
               render();
@@ -328,11 +343,14 @@ AM.booking = (function () {
           el('label', { attrs: { for: 'bk-to' }, class: 'block text-sm mb-1.5', text: i18n.t('booking.to') }),
           el('input', {
             type: 'datetime-local', id: 'bk-to', class: 'w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm',
-            attrs: { min: minValue, step: 3600, value: toInputValue(s.end) },
+            attrs: { min: endMin, step: 3600, value: toInputValue(s.end) },
             onchange: function () {
               const next = dates.inputValueToUtc(this.value);
               if (!next) return;
-              s.end = next;
+              // Clamp instead of accepting: a sub-minimum interval is not a booking.
+              const floor = s.start.getTime() + minHours * 3600000;
+              s.end = next.getTime() < floor ? new Date(floor) : next;
+              this.value = toInputValue(s.end);
               s.errors = {};
               scheduleAvailability();
               render();
@@ -490,7 +508,7 @@ AM.booking = (function () {
 
     const addressOut = root.querySelector('[data-bk-address-out]');
     if (addressOut) {
-      addressOut.replaceChildren(addressResultList(), addressNote(), distanceNote());
+      replaceChildren(addressOut, [addressResultList(), addressNote(), distanceNote()]);
     }
   }
 
