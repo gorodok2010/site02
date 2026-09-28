@@ -131,7 +131,7 @@ window.AM = window.AM || {};
       aut.appendChild(
         el('label', { attrs: { for: id }, class: 'flex items-center gap-3 py-1.5 text-sm cursor-pointer' }, [
           input,
-          el('span', { text: i18n.get() === 'fr' ? 'À partir de ' + km + ' km' : 'From ' + km + ' km' })
+          el('span', { text: i18n.t('filters.autonomieUpTo', { km: km }) })
         ])
       );
     });
@@ -140,22 +140,12 @@ window.AM = window.AM || {};
     );
     panel.appendChild(aut);
 
-    // Poids max — single-select radio, plus an explicit "Any".
+    // Poids max — single-select radio. There is deliberately no "any" option:
+    // unselecting everything is what means "no constraint", and the reset button
+    // gets you back there.
     const poids = el('fieldset', { class: 'mb-5' }, [
       el('legend', { class: 'text-sm font-semibold mb-2', text: i18n.t('filters.poids') })
     ]);
-    const anyId = 'poids-any';
-    poids.appendChild(
-      el('label', { attrs: { for: anyId }, class: 'flex items-center gap-3 py-1.5 text-sm cursor-pointer' }, [
-        el('input', {
-          type: 'radio', name: 'poids', id: anyId, class: 'w-5 h-5',
-          checked: !s.poidsBracket,
-          attrs: { 'data-poids': 'any' },
-          onchange: function () { filters.setPoidsBracket(null); render(); }
-        }),
-        el('span', { text: i18n.t('filters.poidsAny') })
-      ])
-    );
     i18n.POIDS_BRACKETS.forEach(function (b, idx) {
       const id = 'poids-' + idx;
       const on = !!s.poidsBracket && s.poidsBracket.min === b.min && s.poidsBracket.max === b.max;

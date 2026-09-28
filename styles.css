@@ -76,6 +76,27 @@ body {
   cursor: not-allowed;
 }
 
+/* Language toggle. Lives here so index.html and the four content pages — which
+   build their own header — render the control identically. */
+#lang-toggle button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  color: #334155;
+  background: #fff;
+  cursor: pointer;
+}
+
+#lang-toggle button + button {
+  border-left: 1px solid rgb(203 213 225);
+}
+
+#lang-toggle button[aria-pressed="true"] {
+  color: #fff;
+  background: #1d4ed8;
+}
+
 @media print {
   header nav,
   footer,

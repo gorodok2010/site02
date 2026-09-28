@@ -64,11 +64,13 @@ AM.filters = (function () {
     return current;
   }
 
+  // "Up to N km": the vehicle's range must not exceed the selected ceiling.
+  // Multi-select OR, so ticking 15 and 30 means "30 km or less".
   function matchesAutonomie(v, selected) {
     if (!selected.length) return true;
     if (v.autonomie === null) return false;
     for (let i = 0; i < selected.length; i++) {
-      if (v.autonomie >= selected[i]) return true; // "from N km", not "exactly N km"
+      if (v.autonomie <= selected[i]) return true;
     }
     return false;
   }

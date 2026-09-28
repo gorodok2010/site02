@@ -1,148 +1,68 @@
 window.AM = window.AM || {};
 
+// Runtime translation mechanism. Editable copy lives in content.js, not here.
+// This file owns: the language choice, key resolution, plural rules, number and
+// money formatting, and the DOM binding.
+
 AM.i18n = (function () {
   const STORAGE_KEY = 'lang';
   const SUPPORTED = ['fr', 'en'];
   const DEFAULT = 'fr';
 
-  const DICT = {
+  // Technical strings that are not editorial content and never need translating
+  // by hand. Everything a human might want to reword lives in content.js.
+  const RUNTIME = {
     fr: {
-      meta: {
-        title: 'AmiScoot Reims — Location de trottinettes et fauteuils roulants',
-        description: 'Louez une trottinette électrique ou un fauteuil roulant à Reims. Livraison possible dans un rayon de 15 km. Réservation en ligne et paiement sécurisé.'
-      },
-      brand: { name: 'AmiScoot', tagline: 'Location à Reims' },
-      lang: { label: 'Langue', fr: 'FR', en: 'EN', switchTo: 'English' },
+      lang: { label: 'Langue', fr: 'FR', en: 'EN' },
       nav: { call: 'Appeler', whatsapp: 'WhatsApp' },
       banner: {
         offline: 'Le service de réservation en ligne est momentanément indisponible. Pour réserver immédiatement, contactez-nous par téléphone ou WhatsApp au : +33 4 12 13 61 41'
       },
-      hero: {
-        title: 'Louez une trottinette ou un fauteuil roulant à Reims',
-        subtitle: 'Rapide, simple, fiable. Livraison disponible dans un rayon de 15 km.'
-      },
-      category: {
-        label: 'Catégorie',
-        scooter: 'Trottinette électrique',
-        wheelchair: 'Fauteuil roulant'
-      },
-      sort: {
-        label: 'Trier',
-        price_asc: 'Prix croissant',
-        price_desc: 'Prix décroissant',
-        name_asc: 'Nom (A–Z)'
-      },
-      filters: {
-        title: 'Filtres',
-        advanced: 'Filtres avancés',
-        open: 'Ouvrir les filtres',
-        close: 'Fermer',
-        autonomie: 'Autonomie',
-        autonomieHint: 'Cochez pour une autonomie minimale',
-        poids: 'Poids max. supporté',
-        poidsAny: 'Indifférent',
-        pliant: 'Pliant',
-        reset: 'Réinitialiser les filtres',
-        activeCount: '{count} filtre(s) actif(s)'
-      },
-      catalog: {
-        count: { one: '{count} véhicule disponible', other: '{count} véhicules disponibles' },
-        loading: 'Chargement du catalogue',
-        empty: 'Aucun véhicule ne correspond à ces critères.',
-        emptyHint: 'Essayez d’élargir votre sélection.',
-        select: 'Choisir',
-        soon: 'Bientôt disponible',
-        soonHint: 'La réservation en ligne arrive à l’étape suivante.',
-        inactive: 'Indisponible',
-        perHour: '/ heure',
-        autonomie: 'Autonomie',
-        poids: 'Poids max.',
-        pliant: 'Pliant',
-        imageAlt: '{name}'
-      },
-      footer: {
-        legal: 'Mentions légales',
-        privacy: 'Politique de confidentialité',
-        terms: 'CGV',
-        rights: 'Tous droits réservés.',
-        contact: 'Nous contacter',
-        dataUse: 'Vos données servent uniquement au traitement de votre réservation.'
-      },
+      catalog: { loading: 'Chargement du catalogue' },
       a11y: { skipToContent: 'Aller au contenu principal', loading: 'Chargement' }
     },
-
     en: {
-      meta: {
-        title: 'AmiScoot Reims — Scooter and wheelchair rental',
-        description: 'Rent an electric scooter or a wheelchair in Reims. Delivery within a 15 km radius. Book online and pay securely.'
-      },
-      brand: { name: 'AmiScoot', tagline: 'Rental in Reims' },
-      lang: { label: 'Language', fr: 'FR', en: 'EN', switchTo: 'Français' },
+      lang: { label: 'Language', fr: 'FR', en: 'EN' },
       nav: { call: 'Call', whatsapp: 'WhatsApp' },
       banner: {
         offline: 'Online booking is temporarily unavailable. To book right away, please call or WhatsApp us at: +33 4 12 13 61 41'
       },
-      hero: {
-        title: 'Rent a scooter or a wheelchair in Reims',
-        subtitle: 'Fast, simple, reliable. Delivery available within a 15 km radius.'
-      },
-      category: {
-        label: 'Category',
-        scooter: 'Electric scooter',
-        wheelchair: 'Wheelchair'
-      },
-      sort: {
-        label: 'Sort',
-        price_asc: 'Price: low to high',
-        price_desc: 'Price: high to low',
-        name_asc: 'Name (A–Z)'
-      },
-      filters: {
-        title: 'Filters',
-        advanced: 'Advanced filters',
-        open: 'Open filters',
-        close: 'Close',
-        autonomie: 'Range',
-        autonomieHint: 'Tick for a minimum range',
-        poids: 'Max. supported weight',
-        poidsAny: 'Any',
-        pliant: 'Folding',
-        reset: 'Reset filters',
-        activeCount: '{count} active filter(s)'
-      },
-      catalog: {
-        count: { one: '{count} vehicle available', other: '{count} vehicles available' },
-        loading: 'Loading the catalog',
-        empty: 'No vehicle matches these filters.',
-        emptyHint: 'Try widening your selection.',
-        select: 'Select',
-        soon: 'Coming next stage',
-        soonHint: 'Online booking arrives in the next stage.',
-        inactive: 'Unavailable',
-        perHour: '/ hour',
-        autonomie: 'Range',
-        poids: 'Max. load',
-        pliant: 'Folding',
-        imageAlt: '{name}'
-      },
-      footer: {
-        legal: 'Legal notice',
-        privacy: 'Privacy policy',
-        terms: 'Terms & conditions',
-        rights: 'All rights reserved.',
-        contact: 'Contact us',
-        dataUse: 'Your data is used solely to process your booking.'
-      },
+      catalog: { loading: 'Loading the catalog' },
       a11y: { skipToContent: 'Skip to main content', loading: 'Loading' }
     }
   };
 
-  // Category -> weight bracket definitions live with the data they describe.
+  // Editorial copy from content.js wins over the runtime defaults, and is merged
+  // one level deep so a partial override never discards sibling keys.
+  function merge(base, override) {
+    const out = Object.assign({}, base);
+    Object.keys(override).forEach(function (key) {
+      const v = override[key];
+      if (v && typeof v === 'object' && !Array.isArray(v) && base[key] && typeof base[key] === 'object') {
+        out[key] = merge(base[key], v);
+      } else {
+        out[key] = v;
+      }
+    });
+    return out;
+  }
+
+  const EDITORIAL = (window.AM && AM.CONTENT) || { fr: {}, en: {} };
+  const DICT = {
+    fr: merge(RUNTIME.fr, EDITORIAL.fr || {}),
+    en: merge(RUNTIME.en, EDITORIAL.en || {})
+  };
+
+  // Filter option values. These are business rules, not copy: changing them
+  // changes what the catalogue means.
   const AUTONOMIE_OPTIONS = [15, 20, 30];
+
+  // Closed and non-overlapping. A vehicle below the floor or above the ceiling
+  // matches no bracket and is hidden whenever a bracket is selected.
   const POIDS_BRACKETS = [
-    { min: 81, max: 90 }, { min: 91, max: 100 }, { min: 101, max: 110 },
-    { min: 111, max: 120 }, { min: 121, max: 130 }, { min: 131, max: 140 },
-    { min: 141, max: 150 }
+    { min: 50, max: 99 },
+    { min: 100, max: 119 },
+    { min: 120, max: 150 }
   ];
 
   let lang = readStoredLang();
@@ -171,7 +91,7 @@ AM.i18n = (function () {
     return node;
   }
 
-  // t('catalog.count', {count: 12}) -> plural variant chosen by Intl.PluralRules.
+  // t('catalog.count', {count: 12}) picks the plural variant via Intl.PluralRules.
   function t(key, params) {
     const p = params || {};
     let node = resolve(DICT[lang], key);
@@ -201,7 +121,11 @@ AM.i18n = (function () {
     return new Intl.NumberFormat(lang).format(value);
   }
 
-  // data-i18n -> textContent; data-i18n-attr -> "attr:key,attr:key" with params.
+  function locale() {
+    return lang === 'fr' ? 'fr-FR' : 'en-GB';
+  }
+
+  // data-i18n -> textContent; data-i18n-attr -> "attr:key,attr:key".
   function applyI18n(root) {
     const scope = root || document;
 
@@ -210,8 +134,7 @@ AM.i18n = (function () {
     });
 
     scope.querySelectorAll('[data-i18n-attr]').forEach(function (el) {
-      const spec = el.getAttribute('data-i18n-attr');
-      spec.split(',').forEach(function (chunk) {
+      el.getAttribute('data-i18n-attr').split(',').forEach(function (chunk) {
         const idx = chunk.indexOf(':');
         if (idx === -1) return;
         const attr = chunk.slice(0, idx).trim();
@@ -251,6 +174,7 @@ AM.i18n = (function () {
     t: t,
     money: money,
     number: number,
+    locale: locale,
     applyI18n: applyI18n
   };
 })();
