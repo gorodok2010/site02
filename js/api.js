@@ -137,8 +137,15 @@ AM.api = (function () {
   // Availability is read from the `public_bookings` VIEW, never from `bookings`
   // itself. The view exposes only vehicle + window, so no customer data can leak
   // even if the collection is misconfigured later.
+  //
+  // The server filter deliberately narrows on `end_datetime` ONLY. Measured on the
+  // live view: PocketBase stores `start_datetime` with a space separator
+  // ("2026-09-23 19:02:14.000Z") while toISOString() emits a T ("...T18:00:00Z").
+  // Since space < T, `start_datetime < '<T-formatted>'` matches EVERY row of that
+  // day regardless of time. The client-side overlap test below is authoritative and
+  // removes the extras, so this is a narrowing optimisation, never the check itself.
   async function fetchBusyWindows(startUtc, endUtc) {
-    const filter = "(end_datetime > '" + startUtc.toISOString() + "' && start_datetime < '" + endUtc.toISOString() + "')";
+    const filter = "(end_datetime > '" + startUtc.toISOString() + "')";
     const rows = await fetchAllPages('public_bookings', { filter: filter });
 
     const windows = [];
