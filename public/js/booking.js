@@ -636,6 +636,23 @@ AM.booking = (function () {
     ]);
   }
 
+  // The dialog thumbnail points at the same file as the catalogue card, so it is served
+  // from cache: the customer opened the dialog from a card that had already loaded it.
+  // src is assigned after creation because an empty string would resolve to this page's
+  // own URL and fire a pointless request.
+  function vehicleThumb(v) {
+    const img = el('img', {
+      class: 'w-16 h-12 rounded object-cover bg-slate-200 shrink-0',
+      attrs: { alt: i18n.t('catalog.imageAlt', { name: v.name }) },
+      onerror: function () {
+        this.onerror = null;
+        this.src = CFG.fallbackImage;
+      }
+    });
+    img.src = v.image || CFG.fallbackImage;
+    return img;
+  }
+
   function summaryBlock() {
     const p = price();
     let feeText;
@@ -684,10 +701,7 @@ AM.booking = (function () {
       ]),
       el('div', { class: 'px-5 py-4' }, [
         el('div', { class: 'mb-5 flex items-center gap-3 rounded-lg bg-slate-50 p-3' }, [
-          el('img', {
-            class: 'w-16 h-12 rounded object-cover bg-slate-200 shrink-0',
-            attrs: { alt: i18n.t('catalog.imageAlt', { name: v.name }) }
-          }),
+          vehicleThumb(v),
           el('div', {}, [
             el('p', { class: 'font-semibold leading-snug', text: v.name }),
             el('p', { class: 'text-sm text-slate-600', text: i18n.t('booking.perHour', { price: v.pricePerHour === null ? '—' : i18n.money(v.pricePerHour) }) })
