@@ -1,12 +1,11 @@
 window.AM = window.AM || {};
 
-// Booking window: period, collection mode, contact details, live price.
+// Booking window: period, collection mode, contact details, live price, payment.
 //
-// SCOPE — this build is INTERFACE ONLY. The pay button is deliberately inert and no
-// payload is sent anywhere. `AM.api.postBooking` already knows how to talk to the n8n
-// Stripe workflow, so wiring the final submit is a small, isolated change: build the
-// payload in `buildPayload()`, then call `AM.api.postBooking(payload)` and redirect to
-// the returned URL. Nothing else below needs to change.
+// Submit posts buildPayload() to the n8n Stripe workflow, which answers with a Stripe
+// Checkout URL. The customer is redirected to it and pays there; this site never handles
+// card details. `CFG.bookingDisabled` is the kill switch: with it set, Pay stays inert
+// and nothing is ever sent, which is the safe state if the workflow is unavailable.
 
 AM.booking = (function () {
   const CFG = AM.CONFIG;
@@ -32,6 +31,8 @@ AM.booking = (function () {
     addressResults: [],
     addressBusy: false,
     availability: 'idle',  // 'idle' | 'checking' | 'free' | 'busy' | 'failed'
+    submitting: false,
+    submitError: null,
     errors: {},
     lastFocused: null
   };
@@ -133,6 +134,8 @@ AM.booking = (function () {
     s.addressResults = [];
     s.addressBusy = false;
     s.availability = 'idle';
+    s.submitting = false;
+    s.submitError = null;
     s.errors = {};
   }
 
@@ -623,10 +626,102 @@ AM.booking = (function () {
     const summary = root.querySelector('[data-bk-summary]');
     if (summary) summary.replaceWith(summaryBlock());
 
+    // Pay depends on the period, the contact fields, availability and the total, all of
+    // which change while the dialog is open without a re-render. Swap the pair in place
+    // rather than rebuilding the dialog and losing the caret.
+    const pay = root.querySelector('[data-bk-pay]');
+    if (pay) {
+      const hint = root.querySelector('[data-bk-pay-msg]');
+      if (hint) hint.replaceWith(payMessage());
+      pay.replaceWith(payButton());
+    }
+
     const addressOut = root.querySelector('[data-bk-address-out]');
     if (addressOut) {
       replaceChildren(addressOut, [addressResultList(), addressNote(), distanceNote()]);
     }
+  }
+
+  // --- payment ---------------------------------------------------------------
+
+  // Every precondition has to hold before the button is live. In particular the price
+  // must be fully known: a delivery that is still "sur devis" has no total to charge,
+  // and a slot that has not been confirmed free must not be sold.
+  function payBlocker() {
+    if (CFG.bookingDisabled) return 'disabled';
+    if (s.submitting) return 'submitting';
+    if (validatePeriod()) return 'period';
+    if (Object.keys(validateContact()).length) return 'contact';
+    if (s.availability === 'checking' || s.availability === 'idle') return 'checking';
+    if (s.availability !== 'free') return 'unavailable';
+    if (price().total === null) return 'unpriced';
+    return null;
+  }
+
+  function submit() {
+    if (payBlocker()) return;
+    s.submitting = true;
+    s.submitError = null;
+    render();
+
+    api.postBooking(buildPayload())
+      .then(function (url) {
+        // Stripe owns the rest of the flow, including the card form.
+        window.location.assign(url);
+      })
+      .catch(function (err) {
+        s.submitting = false;
+        // A failed call is not fatal and must not lose the form: the customer can retry.
+        // A transport failure and a bad answer need different advice.
+        const kind = err && err.kind;
+        s.submitError = (kind === 'network' || kind === 'timeout') ? 'network' : 'server';
+        // Surfaced for support: "payment failed" on its own does not say whether the
+        // customer's connection or our workflow was at fault.
+        if (window.console && console.warn) {
+          console.warn('[booking] payment submit failed:', kind, err && err.message);
+        }
+        render();
+      });
+  }
+
+  function payButton() {
+    const blocker = payBlocker();
+    const enabled = blocker === null;
+    return el('button', {
+      type: 'button',
+      disabled: !enabled,
+      attrs: { 'aria-disabled': enabled ? null : 'true', 'data-bk-pay': '1' },
+      class: 'w-full rounded-lg px-4 py-3 font-semibold text-sm ' + (enabled
+        ? 'bg-blue-700 text-white hover:bg-blue-800'
+        : 'bg-slate-200 text-slate-500 cursor-not-allowed'),
+      onclick: submit,
+      text: s.submitting ? i18n.t('booking.paySubmitting') : i18n.t('booking.pay')
+    });
+  }
+
+  function payMessage() {
+    if (s.submitError) {
+      return el('p', {
+        class: 'mt-2 text-center text-sm text-red-700',
+        attrs: { role: 'alert', 'data-bk-pay-msg': '1' },
+        text: i18n.t('booking.payError' + (s.submitError === 'network' ? 'Network' : 'Server'))
+      });
+    }
+    const blocker = payBlocker();
+    const hintKey = {
+      disabled: 'payDisabled',
+      period: 'payFixPeriod',
+      contact: 'payFillContact',
+      checking: 'payChecking',
+      unavailable: 'payUnavailable',
+      unpriced: 'payUnpriced',
+      submitting: 'paySubmittingHint'
+    }[blocker];
+    return el('p', {
+      class: 'mt-2 text-center text-xs text-slate-500',
+      attrs: { 'data-bk-pay-msg': '1' },
+      text: hintKey ? i18n.t('booking.' + hintKey) : i18n.t('booking.payHint')
+    });
   }
 
   function row(label, value, strong) {
@@ -720,12 +815,8 @@ AM.booking = (function () {
         ]),
         availabilityBlock(),
         summaryBlock(),
-        el('button', {
-          type: 'button', disabled: true, 'aria-disabled': 'true',
-          class: 'w-full rounded-lg bg-slate-200 text-slate-500 px-4 py-3 font-semibold text-sm cursor-not-allowed',
-          text: i18n.t('booking.pay')
-        }),
-        el('p', { class: 'mt-2 text-center text-xs text-slate-500', text: i18n.t('booking.payHint') })
+        payButton(),
+        payMessage()
       ])
     ]);
 

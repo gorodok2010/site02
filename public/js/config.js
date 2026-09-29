@@ -111,7 +111,12 @@ AM.CONFIG = {
   maxRentalHours: 720,
   timeoutMs: 5000,
 
-  bookingDisabled: false,
+  // Kill switch. While true the pay button stays inert and nothing is ever sent, which is
+  // the correct state until the n8n workflow answers with a Stripe Checkout URL: it
+  // currently replies {"message":"Workflow was started"} because its Webhook node is in
+  // "Immediately" response mode. Flip to false once that is fixed and a test checkout
+  // session has been confirmed to come back.
+  bookingDisabled: true,
 
   // Set to the custom domain once it is attached (e.g. 'https://amiscoot.fr'), and
   // update the n8n CORS allowlist in the same commit. While null, the origin is derived

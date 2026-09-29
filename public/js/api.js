@@ -205,12 +205,14 @@ AM.api = (function () {
   }
 
   async function postBooking(payload) {
+    // No custom request header on purpose. Every extra header has to be named in the
+    // webhook's Access-Control-Allow-Headers or the browser rejects the request at the
+    // preflight and the customer can only reach us by phone. n8n allows "content-type".
     const response = await request(CFG.n8nWebhookUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Booking-Client': 'amiscoot-frontend-v1'
+        'Accept': 'application/json'
       },
       body: JSON.stringify(payload),
       timeoutMs: 15000 // payment session creation is slower than a catalog read
