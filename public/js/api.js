@@ -95,12 +95,17 @@ AM.api = (function () {
 
   // Field names come from the live PocketBase collection, not from the original
   // brief: title / hourly_rate / deposit_amount / is_active.
+  //
+  // Descriptions are kept as two separate fields rather than one translated blob, so an
+  // admin edits them side by side. Both are carried through and resolved per language at
+  // render time, because the customer can switch language after the catalogue loaded.
   function normalizeScooter(raw) {
     const image = Array.isArray(raw.image) ? raw.image[0] : raw.image;
     return {
       id: String(raw.id),
       name: String(raw.title || ''),
-      description: stripHtml(raw.description),
+      descriptionFr: stripHtml(raw.description_fr),
+      descriptionEn: stripHtml(raw.description_en),
       image: image ? (CFG.pocketBaseUrl + '/api/files/scooters/' + raw.id + '/' + encodeURIComponent(image)) : '',
       category: raw.category === 'wheelchair' ? 'wheelchair' : 'scooter',
       autonomie: toNumber(raw.autonomie),
@@ -113,12 +118,19 @@ AM.api = (function () {
     };
   }
 
-  // `description` holds HTML authored in the admin UI. innerHTML is forbidden
-  // project-wide, so the markup is parsed into inert nodes and only the text is kept.
+  // `description_fr` / `description_en` hold HTML authored in the admin UI. innerHTML is
+  // forbidden project-wide, so the markup is parsed into inert nodes and only the text
+  // is kept.
   function stripHtml(value) {
     if (!value) return '';
+    // Block boundaries become spaces before parsing. textContent concatenates sibling
+    // blocks with no separator at all, so "<p>One</p><p>Two</p>" would otherwise read
+    // "OneTwo", and admins do paste more than one paragraph.
+    const marked = String(value)
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/(p|div|li|h[1-6]|tr|blockquote|section)>/gi, ' $&');
     const holder = document.createElement('div');
-    holder.innerHTML = String(value); // never inserted into the live document
+    holder.innerHTML = marked; // never inserted into the live document
     return (holder.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
@@ -226,12 +238,25 @@ AM.api = (function () {
     return null;
   }
 
+  // The description for the language the customer is reading right now.
+  //
+  // There is deliberately no fallback to the other language. Showing French copy on the
+  // English page is the exact bug the split fields exist to remove, so a vehicle without
+  // a translation for the active language simply shows no description.
+  function descriptionOf(vehicle) {
+    if (!vehicle) return '';
+    return AM.i18n.get() === 'en'
+      ? (vehicle.descriptionEn || '')
+      : (vehicle.descriptionFr || '');
+  }
+
   return {
     ApiError: ApiError,
     request: request,
     fetchCatalog: fetchCatalog,
     fetchBusyWindows: fetchBusyWindows,
     searchAddress: searchAddress,
+    descriptionOf: descriptionOf,
     postBooking: postBooking
   };
 })();

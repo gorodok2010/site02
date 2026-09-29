@@ -679,6 +679,7 @@ AM.booking = (function () {
     if (!s.open || !s.vehicle) return;
 
     const v = s.vehicle;
+    const description = api.descriptionOf(v);
 
     const dialog = el('div', {
       class: 'relative w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl',
@@ -704,7 +705,8 @@ AM.booking = (function () {
           vehicleThumb(v),
           el('div', {}, [
             el('p', { class: 'font-semibold leading-snug', text: v.name }),
-            el('p', { class: 'text-sm text-slate-600', text: i18n.t('booking.perHour', { price: v.pricePerHour === null ? '—' : i18n.money(v.pricePerHour) }) })
+            el('p', { class: 'text-sm text-slate-600', text: i18n.t('booking.perHour', { price: v.pricePerHour === null ? '—' : i18n.money(v.pricePerHour) }) }),
+            description ? el('p', { class: 'mt-1 text-sm text-slate-500', text: description }) : null
           ])
         ]),
         periodBlock(),

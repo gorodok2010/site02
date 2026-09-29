@@ -246,6 +246,7 @@ window.AM = window.AM || {};
   }
 
   function renderCard(v) {
+    const description = AM.api.descriptionOf(v);
     const img = el('img', {
       alt: i18n.t('catalog.imageAlt', { name: v.name }),
       loading: 'lazy',
@@ -289,7 +290,7 @@ window.AM = window.AM || {};
     }, [
       img,
       el('h3', { class: 'mt-3 font-semibold leading-snug', text: v.name }),
-      v.description ? el('p', { class: 'mt-1 text-sm text-slate-500', text: v.description }) : null,
+      description ? el('p', { class: 'mt-1 text-sm text-slate-500', text: description }) : null,
       el('div', { class: 'mt-2 flex flex-wrap gap-1' }, [
         el('span', { class: 'rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600', text: i18n.t('category.' + v.category) }),
         v.pliant ? el('span', { class: 'rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800', text: i18n.t('catalog.pliant') }) : null,
