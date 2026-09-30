@@ -30,6 +30,22 @@
       data-i18n="a11y.skipToContent"
     ></a>
 
+    <!-- Return from Stripe Checkout. The query parameter is the only signal the site has
+         that payment succeeded, so it is read once on load and then stripped from the URL
+         to keep a reload from showing a stale confirmation. -->
+    <div
+      id="booking-result"
+      role="status"
+      aria-live="polite"
+      hidden
+      class="px-4 py-3 text-sm sm:text-base"
+      data-result="none"
+    >
+      <div class="mx-auto max-w-6xl">
+        <p id="booking-result-text" class="leading-relaxed"></p>
+      </div>
+    </div>
+
     <!-- Offline banner. Above the header content, per spec. Hidden until needed. -->
     <div
       id="offline-banner"

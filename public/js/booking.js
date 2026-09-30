@@ -869,6 +869,9 @@ AM.booking = (function () {
   // Kept for the next step: everything the Stripe workflow will need, and nothing else.
   function buildPayload() {
     const p = price();
+    // The booking record keeps the distance the fee was derived from. Without it a
+    // later fee change cannot be checked against the order that was actually priced.
+    const km = distanceKm();
     return {
       scooterId: s.vehicle.id,
       startDatetime: s.start.toISOString(),
@@ -880,6 +883,7 @@ AM.booking = (function () {
       deliveryAddress: s.mode === 'delivery' && s.place ? s.place.label : null,
       // 'quote' is a display state, not a price. Never let it reach the webhook.
       deliveryFee: typeof p.fee === 'number' ? p.fee : null,
+      distanceKm: km === null ? null : Math.round(km * 10) / 10,
       depositAmount: p.deposit,
       totalAmount: p.total,
       customerName: s.name.trim(),

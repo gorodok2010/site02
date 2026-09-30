@@ -244,6 +244,8 @@ AM.CONTENT = {
       payDisabled: 'Le paiement en ligne n’est pas encore activé. Contactez-nous par téléphone.',
       payErrorNetwork: 'Impossible de joindre le service de paiement. Vérifiez votre connexion et réessayez.',
       payErrorServer: 'Le paiement n’a pas pu être préparé. Réessayez dans un instant, ou contactez-nous par téléphone.',
+      paidNotice: 'Paiement reçu. Nous vous envoyons un e-mail de confirmation avec les détails de la réservation et la restitution de la caution.',
+      cancelledNotice: 'Paiement annulé : rien n’a été prélevé. Vous pouvez relancer une réservation à tout moment.',
       closeModal: 'Fermer la fenêtre de réservation'
     },
 
@@ -487,6 +489,8 @@ AM.CONTENT = {
       payDisabled: 'Online payment is not available yet. Please call us.',
       payErrorNetwork: 'Could not reach the payment service. Check your connection and try again.',
       payErrorServer: 'The payment could not be prepared. Try again shortly, or call us.',
+      paidNotice: 'Payment received. We are sending you a confirmation e-mail with the booking details and how the deposit is returned.',
+      cancelledNotice: 'Payment cancelled: nothing was charged. You can start a new booking at any time.',
       closeModal: 'Close the booking window'
     },
 

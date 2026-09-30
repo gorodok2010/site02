@@ -18,7 +18,10 @@ AM.CONFIG = {
   },
 
   pocketBaseUrl: 'https://s.reims2026.online',
-  n8nWebhookUrl: 'https://n.reims2026.online/webhook/stripe-events',
+  // Booking intake only. Stripe's own events arrive at a different path that the
+  // payment workflow listens on; pointing this at it would post a browser order into
+  // the event handler.
+  n8nWebhookUrl: 'https://n.reims2026.online/webhook/book-scooter',
   nominatimUrl: 'https://nominatim.openstreetmap.org/search',
   addressCountryCode: 'fr',
 
@@ -111,12 +114,14 @@ AM.CONFIG = {
   maxRentalHours: 720,
   timeoutMs: 5000,
 
-  // Kill switch. While true the pay button stays inert and nothing is ever sent, which is
-  // the correct state until the n8n workflow answers with a Stripe Checkout URL: it
-  // currently replies {"message":"Workflow was started"} because its Webhook node is in
-  // "Immediately" response mode. Flip to false once that is fixed and a test checkout
-  // session has been confirmed to come back.
-  bookingDisabled: true,
+  // Kill switch. While true the pay button stays inert and nothing is ever sent.
+  //
+  // Set to false only after both halves were seen working in Stripe test mode: the
+  // intake returns a Checkout URL, and a completed test payment produced a record in
+  // booking_orders AND a row in public_bookings. The second half depends on the Stripe
+  // webhook endpoint being pointed at /webhook/stripe-events. Enabling the site without
+  // it is the one state that takes money and writes nothing down.
+  bookingDisabled: false,
 
   // Set to the custom domain once it is attached (e.g. 'https://amiscoot.fr'), and
   // update the n8n CORS allowlist in the same commit. While null, the origin is derived

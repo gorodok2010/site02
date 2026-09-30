@@ -340,6 +340,33 @@ window.AM = window.AM || {};
     render();
   }
 
+  // Stripe sends the customer back with ?booking=paid or ?booking=cancelled. The booking
+  // itself is confirmed by Stripe's webhook to the workflow, not by this page, so the
+  // message here is deliberately about the next step rather than a receipt.
+  function showBookingResult() {
+    const node = document.getElementById('booking-result');
+    const text = document.getElementById('booking-result-text');
+    if (!node || !text) return;
+
+    const fromUrl = new URLSearchParams(window.location.search).get('booking');
+    // The parameter is stripped on first read, so the outcome is remembered on the node.
+    // Without that, switching language after paying would leave the notice in the old
+    // language, because render() runs again and the URL no longer says anything.
+    const state = (fromUrl === 'paid' || fromUrl === 'cancelled') ? fromUrl : node.dataset.result;
+    if (state !== 'paid' && state !== 'cancelled') return;
+
+    const paid = state === 'paid';
+    node.dataset.result = state;
+    node.className = 'px-4 py-3 text-sm sm:text-base ' +
+      (paid ? 'bg-emerald-700 text-white' : 'bg-amber-100 text-amber-900');
+    text.textContent = i18n.t(paid ? 'booking.paidNotice' : 'booking.cancelledNotice');
+    node.hidden = false;
+
+    if (fromUrl && window.history && window.history.replaceState) {
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+    }
+  }
+
   // --- render ------------------------------------------------------------------
 
   function render() {
@@ -351,6 +378,7 @@ window.AM = window.AM || {};
     renderCatalog();
     applyStaticValues();
     i18n.applyI18n(document);
+    showBookingResult();
   }
 
   function setLang(lang) {
